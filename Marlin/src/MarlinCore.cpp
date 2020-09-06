@@ -507,6 +507,7 @@ void disable_all_steppers() {
 
   void PrintOneKey(void) {
       // #pragma printone
+      SERIAL_ECHOLNPAIR("PrintOneKey : ", key_flag);
       static uint8_t key_status = 0;
       static uint32_t key_time = 0;
       static uint8_t pause_flag = 0;
@@ -609,6 +610,7 @@ void disable_all_steppers() {
   }
 
       void feed_filament(void) {
+          SERIAL_ECHOLNPAIR("feed_filament : ", key_flag);
           if (IsRunning()) {
               feedRate_t old_feedrate;
               SERIAL_ECHOLN("feed");
@@ -621,6 +623,7 @@ void disable_all_steppers() {
       }
 
       void retract_filament(void) {
+          SERIAL_ECHOLNPAIR("retract_filament : ", key_flag);
           feedRate_t old_feedrate;
           if (IsRunning()) {
               SERIAL_ECHOLN("retract");
@@ -637,6 +640,7 @@ void disable_all_steppers() {
       }
 
       void LoadFilament(void) {
+          SERIAL_ECHOLNPAIR("load_filament : ", key_flag);
           static uint8_t filament_status = 0;
           static uint8_t filament_flag = 0;
           static uint8_t key = 0;
@@ -798,7 +802,7 @@ void disable_all_steppers() {
   void home_key() {
       static uint8_t key_status = 0;
       static uint32_t key_time;
-
+      SERIAL_ECHOLNPAIR("home_key pressed : ", key_flag);
       if (key_flag == 4 || key_flag == 2 || key_flag == 3)
           return;
 
@@ -806,6 +810,7 @@ void disable_all_steppers() {
           if (!READ(HOME_PIN)) {
               key_time = millis() + 50;
               key_status = 1;
+              SERIAL_ECHOLNPAIR("home_key status 0 : ", key_status);
           }
       } else if (key_status == 1) {
           if (key_time <= millis()) {
@@ -814,29 +819,36 @@ void disable_all_steppers() {
               } else {
                   key_status = 0;
               }
+              SERIAL_ECHOLNPAIR("home_key status 1 : ", key_status);
           }
       } else if (key_status == 2) {
           WRITE(HOME_LED, 0);
           DISABLE_AXIS_X();
           DISABLE_AXIS_Y();
           // enqueuecommand("G28 Z0");
-          queue.enqueue_one_P(PSTR("G28 Z0"));
+          queue.enqueue_now_P(PSTR("G28 Z0"));
+          queue.advance();
           key_flag = 1;
           key_status = 4;
+          SERIAL_ECHOLNPAIR("home_key status 2 : ", key_status);
       } else if (key_status == 4) {
           if (READ(HOME_PIN)) {
               key_status = 3;
           }
+          SERIAL_ECHOLNPAIR("home_key status 4 : ", key_status);
       } else if (key_status == 3) {
           if (!planner.has_blocks_queued()) {
               key_status = 0;
               WRITE(HOME_LED, 1);
               key_flag = 0;
+              SERIAL_ECHOLNPAIR("home_key status 3 : ", key_status);
           }
       }
-  }
+      SERIAL_ECHOLNPAIR("end of home_key status: ", key_status);
+    }
 
   void heat_protect(void) {
+      SERIAL_ECHOLNPAIR("heat_protect : ", Temperature::degHotend(0));
       if (Temperature::degHotend(0) < 60)
           return;
       if (IS_SD_PRINTING() == true)
@@ -860,6 +872,7 @@ void disable_all_steppers() {
 
   void cancel_gohome(void) {
     feedRate_t old_feedrate;
+    SERIAL_ECHOLN("extruder heating off!");
     if (cancel_print == 0)
       return;
     if (cancel_gohome_ms > millis())
@@ -878,7 +891,7 @@ void disable_all_steppers() {
 
 
 
-#endif
+#endif //IGHMC
 
   /**
    * A Print Job exists when the timer is running or SD printing
@@ -1031,15 +1044,17 @@ inline void manage_inactivity(const bool ignore_stepper_queue=false) {
     // Handle a standalone HOME button
     constexpr millis_t HOME_DEBOUNCE_DELAY = 1000UL;
     static millis_t next_home_key_ms; // = 0
+    SERIAL_ECHOLNPAIR("ighmc standalone home key: ", HOME_PIN);
     if (!IS_SD_PRINTING() && !READ(HOME_PIN)) { // HOME_PIN goes LOW when pressed
-      const millis_t ms = millis();
-      if (ELAPSED(ms, next_home_key_ms)) {
-        next_home_key_ms = ms + HOME_DEBOUNCE_DELAY;
-        LCD_MESSAGEPGM(MSG_AUTO_HOME);
-        queue.enqueue_now_P(G28_STR);
-      }
+        const millis_t ms = millis();
+        if (ELAPSED(ms, next_home_key_ms)) {
+            next_home_key_ms = ms + HOME_DEBOUNCE_DELAY;
+            LCD_MESSAGEPGM(MSG_AUTO_HOME);
+            queue.enqueue_now_P(G28_STR);
+            queue.advance();
+        }
     }
-  #endif
+#endif
 
   TERN_(USE_CONTROLLER_FAN, controllerFan.update()); // Check if fan should be turned on to cool stepper drivers down
 
